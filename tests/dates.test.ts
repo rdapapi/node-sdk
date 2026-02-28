@@ -12,25 +12,25 @@ describe("date helpers", () => {
   it("parses registered date", () => {
     const d = registeredAt(dates);
     expect(d).toBeInstanceOf(Date);
-    expect(d!.getUTCFullYear()).toBe(2020);
+    expect((d as Date).getUTCFullYear()).toBe(2020);
   });
 
   it("parses expires date", () => {
     const d = expiresAt(dates);
     expect(d).toBeInstanceOf(Date);
-    expect(d!.getUTCFullYear()).toBe(2028);
+    expect((d as Date).getUTCFullYear()).toBe(2028);
   });
 
   it("parses updated date", () => {
     const d = updatedAt(dates);
     expect(d).toBeInstanceOf(Date);
-    expect(d!.getUTCFullYear()).toBe(2024);
+    expect((d as Date).getUTCFullYear()).toBe(2024);
   });
 
   it("calculates days until expiry", () => {
     const days = expiresInDays(dates);
     expect(days).toBeTypeOf("number");
-    expect(days!).toBeGreaterThan(0);
+    expect(days as number).toBeGreaterThan(0);
   });
 
   it("returns null for null fields", () => {
