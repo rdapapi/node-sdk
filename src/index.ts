@@ -32,4 +32,6 @@ export type {
   Remark,
 } from "./types.js";
 
+export { expiresAt, expiresInDays, registeredAt, updatedAt } from "./dates.js";
+
 export { VERSION } from "./version.js";
