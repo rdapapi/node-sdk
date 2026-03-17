@@ -85,7 +85,11 @@ describe("RateLimitError", () => {
 
 describe("TemporarilyUnavailableError", () => {
   it("has status 503, retryAfter, and correct prototype chain", () => {
-    const err = new TemporarilyUnavailableError("Temporarily unavailable", "temporarily_unavailable", 300);
+    const err = new TemporarilyUnavailableError(
+      "Temporarily unavailable",
+      "temporarily_unavailable",
+      300,
+    );
     expect(err.statusCode).toBe(503);
     expect(err.retryAfter).toBe(300);
     expect(err.name).toBe("TemporarilyUnavailableError");
@@ -94,7 +98,11 @@ describe("TemporarilyUnavailableError", () => {
   });
 
   it("handles null retryAfter", () => {
-    const err = new TemporarilyUnavailableError("Temporarily unavailable", "temporarily_unavailable", null);
+    const err = new TemporarilyUnavailableError(
+      "Temporarily unavailable",
+      "temporarily_unavailable",
+      null,
+    );
     expect(err.retryAfter).toBeNull();
   });
 });

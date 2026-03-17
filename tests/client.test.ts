@@ -338,7 +338,10 @@ describe("error handling", () => {
   it("throws TemporarilyUnavailableError on 503 with retryAfter", async () => {
     const client = new RdapClient("test-key", { baseUrl: BASE_URL });
     globalThis.fetch = mockFetch(
-      { error: "temporarily_unavailable", message: "Data for this domain is temporarily unavailable." },
+      {
+        error: "temporarily_unavailable",
+        message: "Data for this domain is temporarily unavailable.",
+      },
       503,
       { "Retry-After": "300" },
     );
@@ -356,7 +359,10 @@ describe("error handling", () => {
   it("throws TemporarilyUnavailableError with null retryAfter when header missing", async () => {
     const client = new RdapClient("test-key", { baseUrl: BASE_URL });
     globalThis.fetch = mockFetch(
-      { error: "temporarily_unavailable", message: "Data for this domain is temporarily unavailable." },
+      {
+        error: "temporarily_unavailable",
+        message: "Data for this domain is temporarily unavailable.",
+      },
       503,
     );
 

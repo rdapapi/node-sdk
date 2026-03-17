@@ -104,7 +104,11 @@ export class RdapClient {
 
     if (response.status === 503) {
       const retryAfter = response.headers.get("Retry-After");
-      throw new TemporarilyUnavailableError(message, error, retryAfter ? parseInt(retryAfter, 10) : null);
+      throw new TemporarilyUnavailableError(
+        message,
+        error,
+        retryAfter ? parseInt(retryAfter, 10) : null,
+      );
     }
 
     const ErrorClass = ERROR_MAP[response.status];
