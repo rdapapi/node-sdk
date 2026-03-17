@@ -5,6 +5,7 @@ import {
   SubscriptionRequiredError,
   NotFoundError,
   RateLimitError,
+  TemporarilyUnavailableError,
   UpstreamError,
 } from "./errors.js";
 import type {
@@ -99,6 +100,11 @@ export class RdapClient {
     if (response.status === 429) {
       const retryAfter = response.headers.get("Retry-After");
       throw new RateLimitError(message, error, retryAfter ? parseInt(retryAfter, 10) : null);
+    }
+
+    if (response.status === 503) {
+      const retryAfter = response.headers.get("Retry-After");
+      throw new TemporarilyUnavailableError(message, error, retryAfter ? parseInt(retryAfter, 10) : null);
     }
 
     const ErrorClass = ERROR_MAP[response.status];

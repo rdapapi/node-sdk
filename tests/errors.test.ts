@@ -6,6 +6,7 @@ import {
   SubscriptionRequiredError,
   NotFoundError,
   RateLimitError,
+  TemporarilyUnavailableError,
   UpstreamError,
 } from "../src/errors.js";
 
@@ -78,6 +79,22 @@ describe("RateLimitError", () => {
 
   it("handles null retryAfter", () => {
     const err = new RateLimitError("Rate limit exceeded", "rate_limit_exceeded", null);
+    expect(err.retryAfter).toBeNull();
+  });
+});
+
+describe("TemporarilyUnavailableError", () => {
+  it("has status 503, retryAfter, and correct prototype chain", () => {
+    const err = new TemporarilyUnavailableError("Temporarily unavailable", "temporarily_unavailable", 300);
+    expect(err.statusCode).toBe(503);
+    expect(err.retryAfter).toBe(300);
+    expect(err.name).toBe("TemporarilyUnavailableError");
+    expect(err).toBeInstanceOf(TemporarilyUnavailableError);
+    expect(err).toBeInstanceOf(RdapApiError);
+  });
+
+  it("handles null retryAfter", () => {
+    const err = new TemporarilyUnavailableError("Temporarily unavailable", "temporarily_unavailable", null);
     expect(err.retryAfter).toBeNull();
   });
 });

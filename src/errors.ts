@@ -55,6 +55,17 @@ export class RateLimitError extends RdapApiError {
   }
 }
 
+/** Raised when the domain data is temporarily unavailable (HTTP 503). */
+export class TemporarilyUnavailableError extends RdapApiError {
+  readonly retryAfter: number | null;
+
+  constructor(message: string, error: string, retryAfter: number | null) {
+    super(message, 503, error);
+    this.name = "TemporarilyUnavailableError";
+    this.retryAfter = retryAfter;
+  }
+}
+
 /** Raised when the upstream RDAP server fails (HTTP 502). */
 export class UpstreamError extends RdapApiError {
   constructor(message: string, error: string) {

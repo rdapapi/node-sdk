@@ -4,6 +4,7 @@ import {
   AuthenticationError,
   NotFoundError,
   RateLimitError,
+  TemporarilyUnavailableError,
   RdapApiError,
   SubscriptionRequiredError,
   UpstreamError,
@@ -331,6 +332,40 @@ describe("error handling", () => {
     } catch (err) {
       expect(err).toBeInstanceOf(RateLimitError);
       expect((err as RateLimitError).retryAfter).toBeNull();
+    }
+  });
+
+  it("throws TemporarilyUnavailableError on 503 with retryAfter", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch(
+      { error: "temporarily_unavailable", message: "Data for this domain is temporarily unavailable." },
+      503,
+      { "Retry-After": "300" },
+    );
+
+    try {
+      await client.domain("test.com");
+      expect.fail("Should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(TemporarilyUnavailableError);
+      expect((err as TemporarilyUnavailableError).retryAfter).toBe(300);
+      expect((err as TemporarilyUnavailableError).statusCode).toBe(503);
+    }
+  });
+
+  it("throws TemporarilyUnavailableError with null retryAfter when header missing", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch(
+      { error: "temporarily_unavailable", message: "Data for this domain is temporarily unavailable." },
+      503,
+    );
+
+    try {
+      await client.domain("test.com");
+      expect.fail("Should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(TemporarilyUnavailableError);
+      expect((err as TemporarilyUnavailableError).retryAfter).toBeNull();
     }
   });
 

@@ -6,6 +6,7 @@ export {
   NotFoundError,
   RateLimitError,
   SubscriptionRequiredError,
+  TemporarilyUnavailableError,
   UpstreamError,
   ValidationError,
 } from "./errors.js";
