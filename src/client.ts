@@ -4,6 +4,7 @@ import {
   AuthenticationError,
   SubscriptionRequiredError,
   NotFoundError,
+  NotSupportedError,
   RateLimitError,
   TemporarilyUnavailableError,
   UpstreamError,
@@ -17,6 +18,10 @@ import type {
   IpResponse,
   NameserverResponse,
   RdapClientOptions,
+  TldListResponse,
+  TldOptions,
+  TldResponse,
+  TldsOptions,
 } from "./types.js";
 import { camelCaseKeys } from "./utils.js";
 import { VERSION } from "./version.js";
@@ -111,6 +116,10 @@ export class RdapClient {
       );
     }
 
+    if (response.status === 404 && error === "not_supported") {
+      throw new NotSupportedError(message, error);
+    }
+
     const ErrorClass = ERROR_MAP[response.status];
     if (ErrorClass) {
       throw new ErrorClass(message, error);
@@ -144,6 +153,74 @@ export class RdapClient {
   /** Look up RDAP registration data for an entity by handle. */
   async entity(handle: string): Promise<EntityResponse> {
     return (await this.request(`/entity/${handle}`)) as EntityResponse;
+  }
+
+  private async conditionalGet<T>(
+    path: string,
+    params: Record<string, string> | undefined,
+    ifNoneMatch: string | undefined,
+  ): Promise<(T & { etag: string | null }) | null> {
+    const url = new URL(`${this.baseUrl}${path}`);
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        url.searchParams.set(key, value);
+      }
+    }
+
+    const headers: Record<string, string> = { ...this.headers };
+    if (ifNoneMatch) {
+      headers["If-None-Match"] = ifNoneMatch;
+    }
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers,
+      signal: AbortSignal.timeout(this.timeout),
+    });
+
+    if (response.status === 304) {
+      return null;
+    }
+
+    const data = (await this.handleResponse(response)) as T;
+    return { ...data, etag: response.headers.get("ETag") };
+  }
+
+  /**
+   * List every TLD the API can resolve via RDAP.
+   *
+   * Does not count against the monthly quota. Returns `null` when
+   * `ifNoneMatch` is provided and matches the server's current `ETag` (HTTP
+   * 304). Otherwise returns a response whose `etag` field can be passed back
+   * on a later call to skip unchanged transfers.
+   */
+  async tlds(options?: TldsOptions): Promise<TldListResponse | null> {
+    const params: Record<string, string> = {};
+    if (options?.since !== undefined) {
+      params.since = options.since;
+    }
+    if (options?.server !== undefined) {
+      params.server = options.server;
+    }
+    return this.conditionalGet<Omit<TldListResponse, "etag">>(
+      "/tlds",
+      Object.keys(params).length > 0 ? params : undefined,
+      options?.ifNoneMatch,
+    );
+  }
+
+  /**
+   * Return catalog metadata for a single TLD.
+   *
+   * Does not count against the monthly quota. Returns `null` on HTTP 304.
+   * Throws {@link NotFoundError} when no RDAP server is registered for the TLD.
+   */
+  async tld(tld: string, options?: TldOptions): Promise<TldResponse | null> {
+    return this.conditionalGet<Omit<TldResponse, "etag">>(
+      `/tlds/${tld}`,
+      undefined,
+      options?.ifNoneMatch,
+    );
   }
 
   /** Look up multiple domains in a single request. Requires a Pro or Business plan. */

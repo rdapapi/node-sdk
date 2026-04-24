@@ -191,3 +191,77 @@ export interface RdapClientOptions {
   baseUrl?: string;
   timeout?: number;
 }
+
+/** Qualitative bucket describing how often a field is populated in a TLD's RDAP responses. */
+export type AvailabilityLevel = "always" | "usually" | "sometimes" | "never";
+
+/** How often each common domain field is populated in a TLD's RDAP responses. */
+export interface FieldAvailability {
+  registrar: AvailabilityLevel;
+  registeredAt: AvailabilityLevel;
+  expiresAt: AvailabilityLevel;
+  nameservers: AvailabilityLevel;
+  status: AvailabilityLevel;
+}
+
+/** Percentage cutoffs used to pick each availability label. */
+export interface TldThresholds {
+  always: number;
+  usually: number;
+  sometimes: number;
+}
+
+/** A single TLD entry from the /tlds catalog. */
+export interface TldEntry {
+  tld: string;
+  supportedSince: string;
+  rdapServerHost: string;
+  rdapServerUrl: string;
+  fieldAvailability: FieldAvailability | null;
+}
+
+/** Metadata for a TLD list response. */
+export interface TldListMeta {
+  computedAt: string;
+  count: number;
+  coverage: number;
+  thresholds: TldThresholds;
+}
+
+/** Metadata for a single-TLD response. */
+export interface TldMeta {
+  computedAt: string;
+  thresholds: TldThresholds;
+}
+
+/** Response from GET /tlds. */
+export interface TldListResponse {
+  data: TldEntry[];
+  meta: TldListMeta;
+  /** ETag returned by the server. Pass back via {@link TldsOptions.ifNoneMatch} to skip unchanged transfers. */
+  etag: string | null;
+}
+
+/** Response from GET /tlds/{tld}. */
+export interface TldResponse {
+  data: TldEntry;
+  meta: TldMeta;
+  /** ETag returned by the server. Pass back via {@link TldOptions.ifNoneMatch} to skip unchanged transfers. */
+  etag: string | null;
+}
+
+/** Options for {@link RdapClient.tlds}. */
+export interface TldsOptions {
+  /** ISO 8601 timestamp. Only TLDs supported after this instant are returned. */
+  since?: string;
+  /** RDAP server hostname filter (case-insensitive). */
+  server?: string;
+  /** Previous ETag. When matched, the method resolves to `null`. */
+  ifNoneMatch?: string;
+}
+
+/** Options for {@link RdapClient.tld}. */
+export interface TldOptions {
+  /** Previous ETag. When matched, the method resolves to `null`. */
+  ifNoneMatch?: string;
+}

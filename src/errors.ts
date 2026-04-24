@@ -36,11 +36,31 @@ export class SubscriptionRequiredError extends RdapApiError {
   }
 }
 
-/** Raised when no RDAP data is found for the query (HTTP 404). */
+/**
+ * Raised when no RDAP data is found for the query (HTTP 404).
+ *
+ * The namespace is covered by an RDAP server but no matching record exists.
+ * For queries where the namespace itself is not covered by RDAP, see
+ * {@link NotSupportedError}, which is a subclass of this error.
+ */
 export class NotFoundError extends RdapApiError {
   constructor(message: string, error: string) {
     super(message, 404, error);
     this.name = "NotFoundError";
+  }
+}
+
+/**
+ * Raised when the query targets a namespace not covered by RDAP (HTTP 404).
+ *
+ * Also a {@link NotFoundError}, so a `catch (NotFoundError)` block handles both
+ * cases. Catch this class first when you want to distinguish "no RDAP server
+ * for this TLD/range" from "namespace covered but no matching record".
+ */
+export class NotSupportedError extends NotFoundError {
+  constructor(message: string, error: string) {
+    super(message, error);
+    this.name = "NotSupportedError";
   }
 }
 

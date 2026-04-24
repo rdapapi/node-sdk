@@ -5,6 +5,7 @@ import {
   AuthenticationError,
   SubscriptionRequiredError,
   NotFoundError,
+  NotSupportedError,
   RateLimitError,
   TemporarilyUnavailableError,
   UpstreamError,
@@ -62,6 +63,18 @@ describe("NotFoundError", () => {
     const err = new NotFoundError("Not found", "not_found");
     expect(err.statusCode).toBe(404);
     expect(err.name).toBe("NotFoundError");
+    expect(err).toBeInstanceOf(NotFoundError);
+    expect(err).toBeInstanceOf(RdapApiError);
+  });
+});
+
+describe("NotSupportedError", () => {
+  it("has status 404 and extends NotFoundError", () => {
+    const err = new NotSupportedError("TLD not supported", "not_supported");
+    expect(err.statusCode).toBe(404);
+    expect(err.error).toBe("not_supported");
+    expect(err.name).toBe("NotSupportedError");
+    expect(err).toBeInstanceOf(NotSupportedError);
     expect(err).toBeInstanceOf(NotFoundError);
     expect(err).toBeInstanceOf(RdapApiError);
   });

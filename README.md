@@ -81,15 +81,24 @@ console.log(domain.entities.registrant?.email); // "registrant@google.com"
 ## Error handling
 
 ```typescript
-import { RdapClient, NotFoundError, RateLimitError, AuthenticationError } from "rdapapi";
+import {
+  RdapClient,
+  NotFoundError,
+  NotSupportedError,
+  RateLimitError,
+  AuthenticationError,
+} from "rdapapi";
 
 const client = new RdapClient("your-api-key");
 
 try {
-  const domain = await client.domain("nonexistent.example");
+  const domain = await client.domain("example.nope");
 } catch (err) {
-  if (err instanceof NotFoundError) {
-    console.log("Domain not found");
+  // Check NotSupportedError before NotFoundError: it's a subclass.
+  if (err instanceof NotSupportedError) {
+    console.log("The TLD is not covered by RDAP");
+  } else if (err instanceof NotFoundError) {
+    console.log("The domain is not registered");
   } else if (err instanceof RateLimitError) {
     console.log(`Rate limited. Retry after ${err.retryAfter}s`);
   } else if (err instanceof AuthenticationError) {
@@ -98,17 +107,60 @@ try {
 }
 ```
 
-All exceptions inherit from `RdapApiError` and include `statusCode`, `error`, and `message` properties.
+`NotSupportedError` extends `NotFoundError`, so catching `NotFoundError` still handles both cases. All exceptions inherit from `RdapApiError` and include `statusCode`, `error`, and `message` properties.
 
-| Exception                     | HTTP Status | When                                |
-| ----------------------------- | ----------- | ----------------------------------- |
-| `ValidationError`             | 400         | Invalid input format                |
-| `AuthenticationError`         | 401         | Missing or invalid API key          |
-| `SubscriptionRequiredError`   | 403         | No active subscription              |
-| `NotFoundError`               | 404         | No RDAP data found                  |
-| `RateLimitError`              | 429         | Rate limit or quota exceeded        |
-| `UpstreamError`               | 502         | Upstream RDAP server error          |
-| `TemporarilyUnavailableError` | 503         | Domain data temporarily unavailable |
+| Exception                     | HTTP Status | When                                                        |
+| ----------------------------- | ----------- | ----------------------------------------------------------- |
+| `ValidationError`             | 400         | Invalid input format                                        |
+| `AuthenticationError`         | 401         | Missing or invalid API key                                  |
+| `SubscriptionRequiredError`   | 403         | No active subscription                                      |
+| `NotFoundError`               | 404         | Namespace is covered but no record exists                   |
+| `NotSupportedError`           | 404         | Namespace (TLD, IP range, ASN range) is not covered by RDAP |
+| `RateLimitError`              | 429         | Rate limit or quota exceeded                                |
+| `UpstreamError`               | 502         | Upstream RDAP server error                                  |
+| `TemporarilyUnavailableError` | 503         | Domain data temporarily unavailable                         |
+
+## Supported TLDs catalog
+
+List every TLD the API can resolve, with the date support was added and a qualitative summary of which fields the registry's RDAP server populates. Does not count against your monthly quota.
+
+```typescript
+const tlds = await client.tlds();
+if (tlds !== null) {
+  console.log(`${tlds.meta.count} TLDs, coverage ${(tlds.meta.coverage * 100).toFixed(0)}%`);
+
+  for (const tld of tlds.data) {
+    const availability = tld.fieldAvailability;
+    if (availability !== null) {
+      console.log(`${tld.tld}: expires_at=${availability.expiresAt}`);
+    }
+  }
+}
+```
+
+Filter to recent additions or to a single registry:
+
+```typescript
+const recent = await client.tlds({ since: "2026-04-01T00:00:00Z" });
+const verisign = await client.tlds({ server: "rdap.verisign.com" });
+```
+
+Pass back the previous `etag` to skip the transfer when nothing has changed:
+
+```typescript
+const first = await client.tlds();
+const later = await client.tlds({ ifNoneMatch: first?.etag ?? undefined });
+if (later === null) {
+  console.log("No change since last poll");
+}
+```
+
+Look up a single TLD:
+
+```typescript
+const com = await client.tld("com");
+console.log(com?.data.rdapServerHost); // "rdap.verisign.com"
+```
 
 ## Configuration
 

@@ -8,6 +8,7 @@ import {
   RdapClient,
   AuthenticationError,
   NotFoundError,
+  NotSupportedError,
   RateLimitError,
   SubscriptionRequiredError,
   RdapApiError,
@@ -16,10 +17,13 @@ import {
 const client = new RdapClient("your-api-key");
 
 try {
-  await client.domain("nonexistent.example");
+  await client.domain("example.nope");
 } catch (err) {
-  if (err instanceof NotFoundError) {
-    console.log("Domain not found in RDAP");
+  // Check NotSupportedError before NotFoundError — it's a subclass.
+  if (err instanceof NotSupportedError) {
+    console.log("The TLD is not covered by RDAP");
+  } else if (err instanceof NotFoundError) {
+    console.log("The domain is not registered");
   } else if (err instanceof AuthenticationError) {
     console.log("Invalid API key — check your credentials");
   } else if (err instanceof RateLimitError) {

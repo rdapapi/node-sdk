@@ -3,6 +3,7 @@ import { RdapClient } from "../src/client.js";
 import {
   AuthenticationError,
   NotFoundError,
+  NotSupportedError,
   RateLimitError,
   TemporarilyUnavailableError,
   RdapApiError,
@@ -19,6 +20,8 @@ import {
   ENTITY_RESPONSE,
   IP_RESPONSE,
   NAMESERVER_RESPONSE,
+  TLDS_RESPONSE,
+  TLD_RESPONSE,
 } from "./fixtures.js";
 
 function mockFetch(body: unknown, status = 200, headers: Record<string, string> = {}) {
@@ -282,7 +285,41 @@ describe("error handling", () => {
     const client = new RdapClient("test-key", { baseUrl: BASE_URL });
     globalThis.fetch = mockFetch({ error: "not_found", message: "Not found." }, 404);
 
-    await expect(client.domain("nope.example")).rejects.toThrow(NotFoundError);
+    try {
+      await client.domain("nope.example");
+      expect.fail("Should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(NotFoundError);
+      expect(err).not.toBeInstanceOf(NotSupportedError);
+    }
+  });
+
+  it("throws NotSupportedError when 404 error code is not_supported", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch(
+      { error: "not_supported", message: "The TLD '.nope' is not supported." },
+      404,
+    );
+
+    try {
+      await client.domain("example.nope");
+      expect.fail("Should have thrown");
+    } catch (err) {
+      expect(err).toBeInstanceOf(NotSupportedError);
+      // Backwards compatible: NotSupportedError IS a NotFoundError.
+      expect(err).toBeInstanceOf(NotFoundError);
+      expect((err as NotSupportedError).error).toBe("not_supported");
+    }
+  });
+
+  it("routes not_supported errors for IP lookups too", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch(
+      { error: "not_supported", message: "No RIR covers this IP range." },
+      404,
+    );
+
+    await expect(client.ip("203.0.113.1")).rejects.toThrow(NotSupportedError);
   });
 
   it("throws ValidationError on 400", async () => {
@@ -415,6 +452,124 @@ describe("error handling", () => {
       expect((err as RdapApiError).message).toBe("HTTP 503");
       expect((err as RdapApiError).error).toBe("unknown_error");
     }
+  });
+});
+
+// === TLDs ===
+
+describe("tlds()", () => {
+  it("returns a camelCase TldListResponse with etag", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch(TLDS_RESPONSE, 200, { ETag: '"abc"' });
+
+    const result = await client.tlds();
+
+    expect(result).not.toBeNull();
+    expect(result?.meta.count).toBe(2);
+    expect(result?.meta.coverage).toBe(0.5);
+    expect(result?.meta.thresholds.always).toBe(0.99);
+    expect(result?.data[0]?.tld).toBe("com");
+    expect(result?.data[0]?.rdapServerHost).toBe("rdap.verisign.com");
+    expect(result?.data[0]?.fieldAvailability?.registeredAt).toBe("always");
+    expect(result?.data[1]?.fieldAvailability).toBeNull();
+    expect(result?.etag).toBe('"abc"');
+  });
+
+  it("forwards since and server query parameters", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch(TLDS_RESPONSE);
+
+    await client.tlds({ since: "2026-04-01T00:00:00Z", server: "rdap.verisign.com" });
+
+    const url = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as string;
+    expect(url).toContain("since=2026-04-01T00%3A00%3A00Z");
+    expect(url).toContain("server=rdap.verisign.com");
+  });
+
+  it("omits params entirely when none provided", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch(TLDS_RESPONSE);
+
+    await client.tlds();
+
+    const url = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as string;
+    expect(url).not.toContain("?");
+  });
+
+  it("returns null on 304 Not Modified", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 304,
+      headers: new Headers(),
+      json: () => Promise.resolve(null),
+    });
+
+    const result = await client.tlds({ ifNoneMatch: '"abc"' });
+
+    expect(result).toBeNull();
+  });
+
+  it("sends If-None-Match header when ifNoneMatch is provided", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    const fetchMock = mockFetch(TLDS_RESPONSE);
+    globalThis.fetch = fetchMock;
+
+    await client.tlds({ ifNoneMatch: '"etag-value"' });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "If-None-Match": '"etag-value"',
+        }),
+      }),
+    );
+  });
+
+  it("returns null etag when server omits the header", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch(TLDS_RESPONSE);
+
+    const result = await client.tlds();
+
+    expect(result?.etag).toBeNull();
+  });
+});
+
+describe("tld()", () => {
+  it("returns a camelCase TldResponse with etag", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch(TLD_RESPONSE, 200, { ETag: '"com-1"' });
+
+    const result = await client.tld("com");
+
+    expect(result).not.toBeNull();
+    expect(result?.data.tld).toBe("com");
+    expect(result?.meta.thresholds.usually).toBe(0.8);
+    expect(result?.etag).toBe('"com-1"');
+  });
+
+  it("returns null on 304 Not Modified", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 304,
+      headers: new Headers(),
+      json: () => Promise.resolve(null),
+    });
+
+    expect(await client.tld("com", { ifNoneMatch: '"com-1"' })).toBeNull();
+  });
+
+  it("throws NotFoundError when the TLD is unknown", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch(
+      { error: "not_found", message: "No RDAP server is registered for the TLD 'nope'." },
+      404,
+    );
+
+    await expect(client.tld("nope")).rejects.toThrow(NotFoundError);
   });
 });
 

@@ -4,6 +4,7 @@ export {
   RdapApiError,
   AuthenticationError,
   NotFoundError,
+  NotSupportedError,
   RateLimitError,
   SubscriptionRequiredError,
   TemporarilyUnavailableError,
@@ -13,6 +14,7 @@ export {
 
 export type {
   AsnResponse,
+  AvailabilityLevel,
   BulkDomainResponse,
   BulkDomainResult,
   BulkDomainSummary,
@@ -23,6 +25,7 @@ export type {
   EntityAutnum,
   EntityNetwork,
   EntityResponse,
+  FieldAvailability,
   IpAddresses,
   IpResponse,
   Meta,
@@ -31,6 +34,14 @@ export type {
   RdapClientOptions,
   Registrar,
   Remark,
+  TldEntry,
+  TldListMeta,
+  TldListResponse,
+  TldMeta,
+  TldOptions,
+  TldResponse,
+  TldThresholds,
+  TldsOptions,
 } from "./types.js";
 
 export { expiresAt, expiresInDays, registeredAt, updatedAt } from "./dates.js";
