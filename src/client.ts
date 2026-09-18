@@ -3,20 +3,22 @@ import {
   ValidationError,
   AuthenticationError,
   SubscriptionRequiredError,
+  GatewayTimeoutError,
   NotFoundError,
   NotSupportedError,
   RateLimitError,
+  RequestFailedError,
   TemporarilyUnavailableError,
   UpstreamError,
 } from "./errors.js";
 import type {
   AsnResponse,
   BulkDomainResponse,
-  BulkDomainResult,
   DomainResponse,
   EntityResponse,
   IpResponse,
   NameserverResponse,
+  PingResponse,
   RdapClientOptions,
   TldListResponse,
   TldOptions,
@@ -34,8 +36,41 @@ const ERROR_MAP: Record<number, new (message: string, error: string) => RdapApiE
   401: AuthenticationError,
   403: SubscriptionRequiredError,
   404: NotFoundError,
-  502: UpstreamError,
+  504: GatewayTimeoutError,
 };
+
+/**
+ * Seconds to wait, from a `Retry-After` header in either RFC 9110 form.
+ *
+ * The API passes an upstream registry's header through verbatim, so the
+ * HTTP-date form really arrives. Returns `null` — never `NaN` — for anything
+ * else, so the caller can fall back and `retryAfter ?? 30` still guards.
+ */
+function parseRetryAfter(header: string | null): number | null {
+  if (header === null) {
+    return null;
+  }
+
+  const value = header.trim();
+  if (/^\d+$/.test(value)) {
+    return parseInt(value, 10);
+  }
+
+  const at = Date.parse(value);
+  if (Number.isNaN(at)) {
+    return null;
+  }
+  return Math.max(0, Math.round((at - Date.now()) / 1000));
+}
+
+/** Seconds to wait before retrying, from the `Retry-After` header or the body. */
+function retryAfterFrom(response: Response, body: Record<string, unknown>): number | null {
+  const header = parseRetryAfter(response.headers.get("Retry-After"));
+  if (header !== null) {
+    return header;
+  }
+  return typeof body.retry_after === "number" ? body.retry_after : null;
+}
 
 export class RdapClient {
   private readonly baseUrl: string;
@@ -101,18 +136,25 @@ export class RdapClient {
 
     const error = (body.error as string | undefined) ?? "unknown_error";
     const message = (body.message as string | undefined) ?? `HTTP ${String(response.status)}`;
+    const retryAfter = retryAfterFrom(response, body);
 
     if (response.status === 429) {
-      const retryAfter = response.headers.get("Retry-After");
-      throw new RateLimitError(message, error, retryAfter ? parseInt(retryAfter, 10) : null);
+      throw new RateLimitError(message, error, retryAfter);
     }
 
     if (response.status === 503) {
-      const retryAfter = response.headers.get("Retry-After");
-      throw new TemporarilyUnavailableError(
+      throw new TemporarilyUnavailableError(message, error, retryAfter);
+    }
+
+    if (response.status === 502) {
+      throw new UpstreamError(message, error, retryAfter);
+    }
+
+    if (response.status === 422) {
+      throw new RequestFailedError(
         message,
         error,
-        retryAfter ? parseInt(retryAfter, 10) : null,
+        (body.errors as Record<string, string[]> | undefined) ?? {},
       );
     }
 
@@ -128,15 +170,42 @@ export class RdapClient {
     throw new RdapApiError(message, response.status, error);
   }
 
-  /** Look up RDAP registration data for a domain name. */
-  async domain(name: string, options?: { follow?: boolean }): Promise<DomainResponse> {
-    const params = options?.follow ? { follow: "true" } : undefined;
-    return (await this.request(`/domain/${name}`, params)) as DomainResponse;
+  /**
+   * Look up registration data for a domain name.
+   *
+   * `follow` merges in the contacts held by the registrar — most `.com` and
+   * `.net` lookups want it. `whois: false` refuses the WHOIS fallback, so a TLD
+   * with no RDAP server throws {@link NotSupportedError} instead of answering.
+   */
+  async domain(
+    name: string,
+    options?: { follow?: boolean; whois?: boolean },
+  ): Promise<DomainResponse> {
+    const params: Record<string, string> = {};
+    if (options?.follow) {
+      params.follow = "true";
+    }
+    if (options?.whois === false) {
+      params.whois = "false";
+    }
+    return (await this.request(
+      `/domain/${name}`,
+      Object.keys(params).length > 0 ? params : undefined,
+    )) as DomainResponse;
   }
 
-  /** Look up RDAP registration data for an IP address. */
-  async ip(address: string): Promise<IpResponse> {
-    return (await this.request(`/ip/${address}`)) as IpResponse;
+  /**
+   * Look up RDAP registration data for an IP address or CIDR block.
+   *
+   * A plain address returns the most specific allocation covering it; a prefix
+   * returns that network, so different prefix lengths can return different
+   * allocations. The prefix can be given either as `options.prefix` or inline
+   * (`"8.8.8.0/24"`).
+   */
+  async ip(address: string, options?: { prefix?: number }): Promise<IpResponse> {
+    const path =
+      options?.prefix === undefined ? `/ip/${address}` : `/ip/${address}/${String(options.prefix)}`;
+    return (await this.request(path)) as IpResponse;
   }
 
   /** Look up RDAP registration data for an ASN. Accepts a number (15169) or string ("AS15169"). */
@@ -187,7 +256,7 @@ export class RdapClient {
   }
 
   /**
-   * List every TLD the API can resolve via RDAP.
+   * List every TLD the API can resolve, and which protocol answers for each.
    *
    * Does not count against the monthly quota. Returns `null` when
    * `ifNoneMatch` is provided and matches the server's current `ETag` (HTTP
@@ -213,7 +282,7 @@ export class RdapClient {
    * Return catalog metadata for a single TLD.
    *
    * Does not count against the monthly quota. Returns `null` on HTTP 304.
-   * Throws {@link NotFoundError} when no RDAP server is registered for the TLD.
+   * Throws {@link NotFoundError} when the TLD is not in the catalog.
    */
   async tld(tld: string, options?: TldOptions): Promise<TldResponse | null> {
     return this.conditionalGet<Omit<TldResponse, "etag">>(
@@ -223,30 +292,48 @@ export class RdapClient {
     );
   }
 
-  /** Look up multiple domains in a single request. Requires a Pro or Business plan. */
+  /**
+   * Look up as many as 10 domains in a single request. Requires a Pro or
+   * Business plan.
+   *
+   * `follow` and `whois` apply to every domain in the request. A failing domain
+   * does not fail the call: check each result's `status`.
+   */
   async bulkDomains(
     domains: string[],
-    options?: { follow?: boolean },
+    options?: { follow?: boolean; whois?: boolean },
   ): Promise<BulkDomainResponse> {
     const body: Record<string, unknown> = { domains };
     if (options?.follow) {
       body.follow = true;
     }
+    if (options?.whois === false) {
+      body.whois = false;
+    }
 
     const raw = (await this.post("/domains/bulk", body)) as BulkDomainResponse;
 
-    // Merge meta from result level into data for each successful result,
-    // so each BulkDomainResult.data is a complete DomainResponse with meta.
+    // Move the result-level meta into data for each successful result, so each
+    // BulkDomainResult.data is a complete DomainResponse. A failed entry keeps
+    // its partial meta where it is.
     for (const result of raw.results) {
-      if (result.status === "success" && result.data && "meta" in result) {
-        const { meta, ...rest } = result as BulkDomainResult & { meta: unknown };
-        result.data.meta = meta as DomainResponse["meta"];
-        Object.assign(result, rest);
-        delete (result as Record<string, unknown>).meta;
+      if (result.status === "success" && result.data && result.meta) {
+        result.data.meta = result.meta;
+        delete result.meta;
       }
     }
 
     return raw;
+  }
+
+  /**
+   * Check that the API is reachable.
+   *
+   * Sent with your API key like every other call, but makes no upstream call
+   * and never counts against your quota. Resolves to `{ status: "ok" }`.
+   */
+  async ping(): Promise<PingResponse> {
+    return (await this.request("/ping")) as PingResponse;
   }
 
   /** Close the client. No-op for native fetch, exists for API parity. */

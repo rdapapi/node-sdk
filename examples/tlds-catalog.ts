@@ -18,10 +18,11 @@ if (tlds !== null) {
   for (const tld of tlds.data.slice(0, 5)) {
     const availability = tld.fieldAvailability;
     if (availability === null) {
-      console.log(`.${tld.tld} via ${tld.rdapServerHost} (not enough data yet)`);
+      // Always null for a WHOIS TLD: availability is measured from RDAP responses.
+      console.log(`.${tld.tld} via ${tld.protocol} at ${tld.server} (no data)`);
     } else {
       console.log(
-        `.${tld.tld} via ${tld.rdapServerHost}: ` +
+        `.${tld.tld} via ${tld.protocol} at ${tld.server}: ` +
           `registrar=${availability.registrar}, expires_at=${availability.expiresAt}`,
       );
     }

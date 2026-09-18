@@ -7,10 +7,13 @@
 import {
   RdapClient,
   AuthenticationError,
+  GatewayTimeoutError,
   NotFoundError,
   NotSupportedError,
   RateLimitError,
+  RequestFailedError,
   SubscriptionRequiredError,
+  UpstreamError,
   RdapApiError,
 } from "rdapapi";
 
@@ -29,7 +32,19 @@ try {
   } else if (err instanceof RateLimitError) {
     console.log(`Rate limited — retry after ${err.retryAfter} seconds`);
   } else if (err instanceof SubscriptionRequiredError) {
-    console.log("Subscription required — upgrade your plan");
+    // One class, three causes: only err.error separates a billing problem from
+    // a temporary IP block, which no plan change fixes.
+    if (err.error === "forbidden") {
+      console.log("Temporarily blocked — wait it out, this is not a plan problem");
+    } else {
+      console.log(`Refused (${err.error}) — subscribe or upgrade your plan`);
+    }
+  } else if (err instanceof RequestFailedError) {
+    console.log(`Invalid request body: ${JSON.stringify(err.errors)}`);
+  } else if (err instanceof UpstreamError) {
+    console.log(`Registry server failed — retry after ${String(err.retryAfter)} seconds`);
+  } else if (err instanceof GatewayTimeoutError) {
+    console.log("Timed out — safe to retry after a short delay");
   } else if (err instanceof RdapApiError) {
     console.log(`API error ${err.statusCode}: ${err.message}`);
   } else {

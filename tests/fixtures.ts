@@ -23,10 +23,45 @@ export const DOMAIN_RESPONSE = {
   nameservers: ["ns1.google.com"],
   dnssec: false,
   entities: {},
+  redacted: {
+    registrar: { iana_id: "replacementValue" },
+    entities: { registrant: { name: "emptyValue", email: "removal" } },
+  },
   meta: {
+    server: "rdap.verisign.com",
+    source: "rdap",
     rdap_server: "https://rdap.verisign.com/com/v1/",
     raw_rdap_url: "https://rdap.verisign.com/com/v1/domain/google.com",
     cached: false,
+    cache_expires: "2026-02-24T15:30:00Z",
+  },
+};
+
+/** A TLD with no RDAP server, answered over WHOIS: no rdap_server, no raw_rdap_url. */
+export const WHOIS_DOMAIN_RESPONSE = {
+  domain: "google.it",
+  unicode_name: null,
+  handle: null,
+  status: ["active"],
+  registrar: {
+    name: "MarkMonitor International Limited",
+    iana_id: null,
+    abuse_email: null,
+    abuse_phone: null,
+    url: "https://www.markmonitor.com/",
+  },
+  dates: {
+    registered: "1999-12-10T00:00:00Z",
+    expires: "2027-04-21T00:00:00Z",
+    updated: "2026-06-09T23:13:34Z",
+  },
+  nameservers: ["ns1.google.com", "ns2.google.com"],
+  dnssec: null,
+  entities: {},
+  meta: {
+    server: "whois.nic.it",
+    source: "whois",
+    cached: true,
     cache_expires: "2026-02-24T15:30:00Z",
   },
 };
@@ -44,9 +79,12 @@ export const IP_RESPONSE = {
   dates: { registered: "2014-03-14T00:00:00Z", expires: null, updated: null },
   entities: {},
   cidr: ["8.8.8.0/24"],
+  geofeed: "https://geofeed.example.net/geofeed.csv",
   remarks: [{ title: "description", description: "Google DNS" }],
   port43: "whois.arin.net",
   meta: {
+    server: "rdap.arin.net",
+    source: "rdap",
     rdap_server: "https://rdap.arin.net/registry/",
     raw_rdap_url: "https://rdap.arin.net/registry/ip/8.8.8.0",
     cached: false,
@@ -60,12 +98,15 @@ export const ASN_RESPONSE = {
   type: null,
   start_autnum: 15169,
   end_autnum: 15169,
+  country: "US",
   status: ["active"],
   dates: { registered: "2000-03-30T00:00:00-05:00", expires: null, updated: null },
   entities: {},
   remarks: [],
   port43: "whois.arin.net",
   meta: {
+    server: "rdap.arin.net",
+    source: "rdap",
     rdap_server: "https://rdap.arin.net/registry/",
     raw_rdap_url: "https://rdap.arin.net/registry/autnum/15169",
     cached: false,
@@ -82,6 +123,8 @@ export const NAMESERVER_RESPONSE = {
   dates: { registered: null, expires: null, updated: null },
   entities: {},
   meta: {
+    server: "rdap.verisign.com",
+    source: "rdap",
     rdap_server: "https://rdap.verisign.com/com/v1/",
     raw_rdap_url: "https://rdap.verisign.com/com/v1/nameserver/ns1.google.com",
     cached: false,
@@ -131,6 +174,8 @@ export const ENTITY_RESPONSE = {
     },
   ],
   meta: {
+    server: "rdap.arin.net",
+    source: "rdap",
     rdap_server: "https://rdap.arin.net/registry/",
     raw_rdap_url: "https://rdap.arin.net/registry/entity/GOGL",
     cached: false,
@@ -165,11 +210,20 @@ export const BULK_RESPONSE = {
         entities: {},
       },
       meta: {
+        server: "rdap.verisign.com",
+        source: "rdap",
         rdap_server: "https://rdap.verisign.com/com/v1/",
         raw_rdap_url: "https://rdap.verisign.com/com/v1/domain/google.com",
         cached: false,
         cache_expires: "2026-02-25T15:30:00Z",
       },
+    },
+    {
+      domain: "nope.example",
+      status: "error",
+      error: "not_found",
+      message: "This domain was not found. It may not be registered.",
+      meta: { server: "rdap.verisign.com", source: "rdap" },
     },
     {
       domain: "invalid..com",
@@ -178,7 +232,7 @@ export const BULK_RESPONSE = {
       message: "The provided domain name is not valid.",
     },
   ],
-  summary: { total: 2, successful: 1, failed: 1 },
+  summary: { total: 3, successful: 1, failed: 2 },
 };
 
 export const BASE_URL = "https://rdapapi.io/api/v1";
@@ -187,7 +241,9 @@ export const TLDS_RESPONSE = {
   data: [
     {
       tld: "com",
+      protocol: "rdap",
       supported_since: "2026-03-07T00:00:00Z",
+      server: "rdap.verisign.com",
       rdap_server_host: "rdap.verisign.com",
       rdap_server_url: "https://rdap.verisign.com/com/v1/",
       field_availability: {
@@ -199,10 +255,12 @@ export const TLDS_RESPONSE = {
       },
     },
     {
-      tld: "fr",
-      supported_since: "2026-03-07T00:00:00Z",
-      rdap_server_host: "rdap.nic.fr",
-      rdap_server_url: "https://rdap.nic.fr/",
+      tld: "it",
+      protocol: "whois",
+      supported_since: "2026-05-13T11:21:03Z",
+      server: "whois.nic.it",
+      rdap_server_host: null,
+      rdap_server_url: null,
       field_availability: null,
     },
   ],
@@ -217,7 +275,9 @@ export const TLDS_RESPONSE = {
 export const TLD_RESPONSE = {
   data: {
     tld: "com",
+    protocol: "rdap",
     supported_since: "2026-03-07T00:00:00Z",
+    server: "rdap.verisign.com",
     rdap_server_host: "rdap.verisign.com",
     rdap_server_url: "https://rdap.verisign.com/com/v1/",
     field_availability: {

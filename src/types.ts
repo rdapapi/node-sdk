@@ -1,9 +1,19 @@
-/** Metadata about the RDAP lookup. */
+/** Which protocol answered a lookup. */
+export type Source = "rdap" | "whois";
+
+/** Metadata about the lookup: where the answer came from, and how it was served. */
 export interface Meta {
-  rdapServer: string;
-  rawRdapUrl: string;
-  cached: boolean;
-  cacheExpires: string;
+  /** Hostname of the upstream that answered. Occasionally null on an older cached record. */
+  server: string | null;
+  source: Source;
+  /** @deprecated Use {@link Meta.server} or {@link Meta.rawRdapUrl}. Absent when `source` is `whois`. */
+  rdapServer?: string;
+  /** Absent when `source` is `whois`, or when a stored snapshot answered. */
+  rawRdapUrl?: string;
+  /** Omitted from the partial `meta` of a failed bulk entry. */
+  cached?: boolean;
+  /** Omitted from the partial `meta` of a failed bulk entry. */
+  cacheExpires?: string;
   followed?: boolean | null;
   registrarRdapServer?: string | null;
   followError?: string | null;
@@ -52,6 +62,37 @@ export interface Remark {
   description: string;
 }
 
+/**
+ * How a value was withheld: `removal` deleted it, `emptyValue` blanked it,
+ * `partialValue` truncated it, and `replacementValue` published a substitute.
+ *
+ * An unrecognised method from a server is passed through unchanged, so treat
+ * this as an open set rather than a closed enum.
+ */
+export type RedactionMethod =
+  | "removal"
+  | "emptyValue"
+  | "partialValue"
+  | "replacementValue"
+  | (string & {});
+
+/**
+ * What the upstream server declared it withheld, mirroring the shape of the
+ * record it describes: a claim about `entities.registrant.name` sits at
+ * `redacted.entities.registrant.name`. Field names are camelCased like the rest
+ * of the response.
+ *
+ * Absent when the server declared nothing, which is not evidence that nothing
+ * was withheld.
+ */
+export interface Redaction {
+  handle?: RedactionMethod;
+  /** Claims about the top-level `registrar` object. Domain lookups only. */
+  registrar?: Record<string, RedactionMethod>;
+  /** Claims keyed by contact role, then by field within that contact. */
+  entities?: Record<string, Record<string, RedactionMethod>>;
+}
+
 /** Response from a domain lookup. */
 export interface DomainResponse {
   domain: string;
@@ -61,8 +102,10 @@ export interface DomainResponse {
   registrar: Registrar;
   dates: Dates;
   nameservers: string[];
-  dnssec: boolean;
+  /** `null` where the registry publishes no DNSSEC status, as `.tr`, `.gg` and `.nc` do not. */
+  dnssec: boolean | null;
   entities: Entities;
+  redacted?: Redaction;
   meta: Meta;
 }
 
@@ -86,8 +129,14 @@ export interface IpResponse {
   dates: Dates;
   entities: Entities;
   cidr: string[];
+  /**
+   * URL of the RFC 8805 geofeed this network publishes, as published: never
+   * fetched, never inherited from a parent network. `null` when there is none.
+   */
+  geofeed: string | null;
   remarks: Remark[];
   port43: string | null;
+  redacted?: Redaction;
   meta: Meta;
 }
 
@@ -98,11 +147,14 @@ export interface AsnResponse {
   type: string | null;
   startAutnum: number | null;
   endAutnum: number | null;
+  /** Derived from the contact entities' address; regional registries carry no top-level country. */
+  country: string | null;
   status: string[];
   dates: Dates;
   entities: Entities;
   remarks: Remark[];
   port43: string | null;
+  redacted?: Redaction;
   meta: Meta;
 }
 
@@ -115,6 +167,7 @@ export interface NameserverResponse {
   status: string[];
   dates: Dates;
   entities: Entities;
+  redacted?: Redaction;
   meta: Meta;
 }
 
@@ -161,6 +214,7 @@ export interface EntityResponse {
   entities: Entities;
   autnums: EntityAutnum[];
   networks: EntityNetwork[];
+  redacted?: Redaction;
   meta: Meta;
 }
 
@@ -171,6 +225,13 @@ export interface BulkDomainResult {
   data?: DomainResponse | null;
   error?: string | null;
   message?: string | null;
+  /**
+   * Partial `meta` for a failed entry, naming the upstream that was tried.
+   * Absent when the entry failed before an upstream was chosen, as
+   * `invalid_domain` does. On a successful entry the full `meta` is moved onto
+   * {@link BulkDomainResult.data} instead.
+   */
+  meta?: Meta;
 }
 
 /** Summary counts for a bulk domain lookup. */
@@ -184,6 +245,11 @@ export interface BulkDomainSummary {
 export interface BulkDomainResponse {
   results: BulkDomainResult[];
   summary: BulkDomainSummary;
+}
+
+/** Response from the health check endpoint. */
+export interface PingResponse {
+  status: string;
 }
 
 /** Options for the RdapClient constructor. */
@@ -214,9 +280,16 @@ export interface TldThresholds {
 /** A single TLD entry from the /tlds catalog. */
 export interface TldEntry {
   tld: string;
+  /** `whois` marks the ccTLDs IANA lists no RDAP server for. */
+  protocol: Source;
   supportedSince: string;
-  rdapServerHost: string;
-  rdapServerUrl: string;
+  /** Hostname of the upstream that answers for this TLD. What `?server=` filters on. */
+  server: string;
+  /** @deprecated Superseded by {@link TldEntry.server}. Null when `protocol` is `whois`. */
+  rdapServerHost: string | null;
+  /** Null when `protocol` is `whois`, which has no URL form. */
+  rdapServerUrl: string | null;
+  /** Null while a TLD is still accruing observations, and always null when `protocol` is `whois`. */
   fieldAvailability: FieldAvailability | null;
 }
 

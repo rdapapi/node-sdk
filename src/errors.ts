@@ -28,7 +28,12 @@ export class AuthenticationError extends RdapApiError {
   }
 }
 
-/** Raised when no active subscription exists (HTTP 403). */
+/**
+ * Raised when the request is refused for the account (HTTP 403).
+ *
+ * Covers `subscription_required`, `plan_upgrade_required` and `forbidden` (a
+ * temporary IP block). Read {@link RdapApiError.error} to tell them apart.
+ */
 export class SubscriptionRequiredError extends RdapApiError {
   constructor(message: string, error: string) {
     super(message, 403, error);
@@ -86,10 +91,38 @@ export class TemporarilyUnavailableError extends RdapApiError {
   }
 }
 
-/** Raised when the upstream RDAP server fails (HTTP 502). */
+/** Raised when the upstream RDAP or WHOIS server fails (HTTP 502). */
 export class UpstreamError extends RdapApiError {
-  constructor(message: string, error: string) {
+  readonly retryAfter: number | null;
+
+  constructor(message: string, error: string, retryAfter: number | null = null) {
     super(message, 502, error);
     this.name = "UpstreamError";
+    this.retryAfter = retryAfter;
+  }
+}
+
+/**
+ * Raised when the request body fails validation (HTTP 422).
+ *
+ * Only the bulk endpoint takes a body, so this is what an over-long or
+ * malformed `domains` list returns. {@link RequestFailedError.errors} names the
+ * offending fields.
+ */
+export class RequestFailedError extends RdapApiError {
+  readonly errors: Record<string, string[]>;
+
+  constructor(message: string, error: string, errors: Record<string, string[]> = {}) {
+    super(message, 422, error);
+    this.name = "RequestFailedError";
+    this.errors = errors;
+  }
+}
+
+/** Raised when the request did not complete in time (HTTP 504). Safe to retry. */
+export class GatewayTimeoutError extends RdapApiError {
+  constructor(message: string, error: string) {
+    super(message, 504, error);
+    this.name = "GatewayTimeoutError";
   }
 }

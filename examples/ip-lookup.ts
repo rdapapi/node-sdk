@@ -14,12 +14,18 @@ console.log(`IP: ${ip.startAddress} - ${ip.endAddress}`);
 console.log(`Name: ${ip.name}`);
 console.log(`Country: ${ip.country}`);
 console.log(`CIDR: ${ip.cidr.join(", ")}`);
+console.log(`Geofeed: ${ip.geofeed ?? "none published"}`);
+
+// A CIDR block returns that network, which may differ from the address's allocation.
+const net = await client.ip("8.8.8.0", { prefix: 24 });
+console.log(`Network: ${net.handle}`);
 
 // ASN lookup
 const asn = await client.asn(15169);
 console.log(`\nASN: ${asn.handle}`);
 console.log(`Name: ${asn.name}`);
 console.log(`Range: ${asn.startAutnum} - ${asn.endAutnum}`);
+console.log(`Country: ${asn.country}`);
 
 // Nameserver lookup
 const ns = await client.nameserver("ns1.google.com");

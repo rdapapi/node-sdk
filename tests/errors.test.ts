@@ -7,7 +7,9 @@ import {
   NotFoundError,
   NotSupportedError,
   RateLimitError,
+  RequestFailedError,
   TemporarilyUnavailableError,
+  GatewayTimeoutError,
   UpstreamError,
 } from "../src/errors.js";
 
@@ -122,10 +124,44 @@ describe("TemporarilyUnavailableError", () => {
 
 describe("UpstreamError", () => {
   it("has status 502 and correct prototype chain", () => {
-    const err = new UpstreamError("Upstream failed", "upstream_error");
+    const err = new UpstreamError("Upstream failed", "lookup_failed");
     expect(err.statusCode).toBe(502);
     expect(err.name).toBe("UpstreamError");
+    expect(err.retryAfter).toBeNull();
     expect(err).toBeInstanceOf(UpstreamError);
+    expect(err).toBeInstanceOf(RdapApiError);
+  });
+
+  it("carries retryAfter when the server supplies one", () => {
+    const err = new UpstreamError("Upstream failed", "lookup_failed", 60);
+    expect(err.retryAfter).toBe(60);
+  });
+});
+
+describe("RequestFailedError", () => {
+  it("has status 422, per-field errors, and correct prototype chain", () => {
+    const err = new RequestFailedError("Validation failed", "request_failed", {
+      domains: ["The domains field must not have more than 10 items."],
+    });
+    expect(err.statusCode).toBe(422);
+    expect(err.name).toBe("RequestFailedError");
+    expect(err.errors.domains).toHaveLength(1);
+    expect(err).toBeInstanceOf(RequestFailedError);
+    expect(err).toBeInstanceOf(RdapApiError);
+  });
+
+  it("defaults errors to an empty object", () => {
+    const err = new RequestFailedError("Validation failed", "request_failed");
+    expect(err.errors).toEqual({});
+  });
+});
+
+describe("GatewayTimeoutError", () => {
+  it("has status 504 and correct prototype chain", () => {
+    const err = new GatewayTimeoutError("Timed out", "gateway_timeout");
+    expect(err.statusCode).toBe(504);
+    expect(err.name).toBe("GatewayTimeoutError");
+    expect(err).toBeInstanceOf(GatewayTimeoutError);
     expect(err).toBeInstanceOf(RdapApiError);
   });
 });

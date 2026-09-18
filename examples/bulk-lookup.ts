@@ -22,7 +22,9 @@ for (const r of result.results) {
       `  ${r.data.domain}: registrar=${r.data.registrar.name}, expires=${r.data.dates.expires}`,
     );
   } else {
-    console.log(`  ${r.domain}: ${r.error} — ${r.message}`);
+    // A failed entry carries a partial meta naming the upstream that was tried,
+    // unless it failed before one was chosen.
+    console.log(`  ${r.domain}: ${r.error} — ${r.message} (via ${r.meta?.server ?? "n/a"})`);
   }
 }
 
