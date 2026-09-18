@@ -29,6 +29,7 @@
     "build": "tsup",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
+    "canary": "node tests/canary.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . && publint",
     "format": "prettier --write .",
