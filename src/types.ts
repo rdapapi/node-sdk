@@ -70,11 +70,7 @@ export interface Remark {
  * this as an open set rather than a closed enum.
  */
 export type RedactionMethod =
-  | "removal"
-  | "emptyValue"
-  | "partialValue"
-  | "replacementValue"
-  | (string & {});
+  "removal" | "emptyValue" | "partialValue" | "replacementValue" | (string & {});
 
 /**
  * What the upstream server declared it withheld, mirroring the shape of the
