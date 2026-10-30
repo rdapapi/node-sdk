@@ -503,6 +503,13 @@ describe("error handling", () => {
     }
   });
 
+  it("throws UpstreamError on a 503 lookup_failed", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch({ error: "lookup_failed", message: "RDAP lookup failed." }, 503);
+
+    await expect(client.domain("test.com")).rejects.toBeInstanceOf(UpstreamError);
+  });
+
   it("throws UpstreamError on 502 with retryAfter", async () => {
     const client = new RdapClient("test-key", { baseUrl: BASE_URL });
     globalThis.fetch = mockFetch(

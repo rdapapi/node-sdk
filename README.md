@@ -172,7 +172,7 @@ try {
 | `NotSupportedError`           | 404         | `not_supported`                                                                                                                         |
 | `RequestFailedError`          | 422         | `request_failed` — `errors` names the fields                                                                                            |
 | `RateLimitError`              | 429         | `rate_limit_exceeded`, `quota_exceeded`, `too_many_requests`                                                                            |
-| `UpstreamError`               | 502         | `lookup_failed`, `bad_gateway`                                                                                                          |
+| `UpstreamError`               | 503, 502    | `lookup_failed` (503), `bad_gateway` (502)                                                                                              |
 | `TemporarilyUnavailableError` | 503         | `temporarily_unavailable`, `service_unavailable`                                                                                        |
 | `GatewayTimeoutError`         | 504         | `gateway_timeout`                                                                                                                       |
 | `RdapApiError`                | 5xx         | `server_error`, and anything else unmapped                                                                                              |

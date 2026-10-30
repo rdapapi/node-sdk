@@ -91,7 +91,7 @@ export class TemporarilyUnavailableError extends RdapApiError {
   }
 }
 
-/** Raised when the upstream RDAP or WHOIS server fails (HTTP 502). */
+/** Raised when the upstream RDAP or WHOIS server fails (`lookup_failed`, `bad_gateway`). */
 export class UpstreamError extends RdapApiError {
   readonly retryAfter: number | null;
 

@@ -142,12 +142,13 @@ export class RdapClient {
       throw new RateLimitError(message, error, retryAfter);
     }
 
-    if (response.status === 503) {
-      throw new TemporarilyUnavailableError(message, error, retryAfter);
+    // The API sends lookup_failed as 503, as its CDN replaces 502 bodies.
+    if (response.status === 502 || (response.status === 503 && error === "lookup_failed")) {
+      throw new UpstreamError(message, error, retryAfter);
     }
 
-    if (response.status === 502) {
-      throw new UpstreamError(message, error, retryAfter);
+    if (response.status === 503) {
+      throw new TemporarilyUnavailableError(message, error, retryAfter);
     }
 
     if (response.status === 422) {
