@@ -113,8 +113,8 @@ export class TemporarilyUnavailableError extends RdapApiError {
 export class UpstreamError extends RdapApiError {
   readonly retryAfter: number | null;
 
-  constructor(message: string, error: string, retryAfter: number | null = null) {
-    super(message, 502, error);
+  constructor(message: string, error: string, retryAfter: number | null = null, statusCode = 502) {
+    super(message, statusCode, error);
     this.name = "UpstreamError";
     this.retryAfter = retryAfter;
   }

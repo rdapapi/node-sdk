@@ -143,7 +143,7 @@ export class RdapClient {
 
     // The API sends lookup_failed as 503, as its CDN replaces 502 bodies.
     if (response.status === 502 || (response.status === 503 && error === "lookup_failed")) {
-      throw new UpstreamError(message, error, retryAfter);
+      throw new UpstreamError(message, error, retryAfter, response.status);
     }
 
     if (response.status === 503) {
