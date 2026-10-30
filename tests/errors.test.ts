@@ -68,6 +68,12 @@ describe("NotFoundError", () => {
     expect(err).toBeInstanceOf(NotFoundError);
     expect(err).toBeInstanceOf(RdapApiError);
   });
+
+  it("defaults reason and registrableDomain to null", () => {
+    const err = new NotFoundError("Not found", "not_found");
+    expect(err.reason).toBeNull();
+    expect(err.registrableDomain).toBeNull();
+  });
 });
 
 describe("NotSupportedError", () => {

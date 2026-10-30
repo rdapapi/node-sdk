@@ -35,7 +35,6 @@ const ERROR_MAP: Record<number, new (message: string, error: string) => RdapApiE
   400: ValidationError,
   401: AuthenticationError,
   403: SubscriptionRequiredError,
-  404: NotFoundError,
   504: GatewayTimeoutError,
 };
 
@@ -159,8 +158,14 @@ export class RdapClient {
       );
     }
 
-    if (response.status === 404 && error === "not_supported") {
-      throw new NotSupportedError(message, error);
+    if (response.status === 404) {
+      const NotFoundClass = error === "not_supported" ? NotSupportedError : NotFoundError;
+      throw new NotFoundClass(
+        message,
+        error,
+        typeof body.reason === "string" ? body.reason : null,
+        typeof body.registrable_domain === "string" ? body.registrable_domain : null,
+      );
     }
 
     const ErrorClass = ERROR_MAP[response.status];

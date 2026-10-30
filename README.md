@@ -168,7 +168,7 @@ try {
 | `ValidationError`             | 400         | `invalid_domain`, `invalid_ip`, `invalid_asn`, `invalid_nameserver`, `invalid_handle`, `invalid_prefix`, `invalid_since`, `bad_request` |
 | `AuthenticationError`         | 401         | `unauthenticated`                                                                                                                       |
 | `SubscriptionRequiredError`   | 403         | `subscription_required`, `plan_upgrade_required`, `forbidden`                                                                           |
-| `NotFoundError`               | 404         | `not_found`                                                                                                                             |
+| `NotFoundError`               | 404         | `not_found`, `domain_reserved` (`reason`), `not_registrable` (`registrableDomain`)                                                      |
 | `NotSupportedError`           | 404         | `not_supported`                                                                                                                         |
 | `RequestFailedError`          | 422         | `request_failed` — `errors` names the fields                                                                                            |
 | `RateLimitError`              | 429         | `rate_limit_exceeded`, `quota_exceeded`, `too_many_requests`                                                                            |

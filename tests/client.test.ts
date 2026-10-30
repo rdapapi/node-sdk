@@ -315,6 +315,34 @@ describe("bulkDomains()", () => {
     expect(result.results[2]?.meta).toBeUndefined();
   });
 
+  it("carries reason and registrableDomain on failed entries", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch({
+      results: [
+        {
+          domain: "si.si",
+          status: "error",
+          error: "domain_reserved",
+          message: "This domain is reserved by the registry.",
+          reason: "si.si is forbidden (Rezervirano za RS)",
+        },
+        {
+          domain: "www.example.com",
+          status: "error",
+          error: "not_registrable",
+          message: "www.example.com is not a registrable domain.",
+          registrable_domain: "example.com",
+        },
+      ],
+      summary: { total: 2, successful: 0, failed: 2 },
+    });
+
+    const result = await client.bulkDomains(["si.si", "www.example.com"]);
+
+    expect(result.results[0]?.reason).toBe("si.si is forbidden (Rezervirano za RS)");
+    expect(result.results[1]?.registrableDomain).toBe("example.com");
+  });
+
   it("sends whois=false for every domain in the request", async () => {
     const client = new RdapClient("test-key", { baseUrl: BASE_URL });
     const fetchMock = mockFetch(BULK_RESPONSE);
@@ -401,6 +429,40 @@ describe("error handling", () => {
       expect(err).toBeInstanceOf(NotFoundError);
       expect((err as NotSupportedError).error).toBe("not_supported");
     }
+  });
+
+  it("carries reason on a domain_reserved 404", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch(
+      {
+        error: "domain_reserved",
+        message: "This domain is reserved by the registry.",
+        reason: "si.si is forbidden (Rezervirano za RS)",
+      },
+      404,
+    );
+
+    const err = await client.domain("si.si").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NotFoundError);
+    expect((err as NotFoundError).reason).toBe("si.si is forbidden (Rezervirano za RS)");
+    expect((err as NotFoundError).registrableDomain).toBeNull();
+  });
+
+  it("carries registrableDomain on a not_registrable 404", async () => {
+    const client = new RdapClient("test-key", { baseUrl: BASE_URL });
+    globalThis.fetch = mockFetch(
+      {
+        error: "not_registrable",
+        message: "www.example.com is not a registrable domain.",
+        registrable_domain: "example.com",
+      },
+      404,
+    );
+
+    const err = await client.domain("www.example.com").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NotFoundError);
+    expect((err as NotFoundError).registrableDomain).toBe("example.com");
+    expect((err as NotFoundError).reason).toBeNull();
   });
 
   it("routes not_supported errors for IP lookups too", async () => {

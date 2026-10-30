@@ -47,11 +47,24 @@ export class SubscriptionRequiredError extends RdapApiError {
  * The namespace is covered by an RDAP server but no matching record exists.
  * For queries where the namespace itself is not covered by RDAP, see
  * {@link NotSupportedError}, which is a subclass of this error.
+ *
+ * `reason` carries the registry's own wording for `domain_reserved`, and
+ * `registrableDomain` the name to look up instead for `not_registrable`.
  */
 export class NotFoundError extends RdapApiError {
-  constructor(message: string, error: string) {
+  readonly reason: string | null;
+  readonly registrableDomain: string | null;
+
+  constructor(
+    message: string,
+    error: string,
+    reason: string | null = null,
+    registrableDomain: string | null = null,
+  ) {
     super(message, 404, error);
     this.name = "NotFoundError";
+    this.reason = reason;
+    this.registrableDomain = registrableDomain;
   }
 }
 
@@ -63,8 +76,13 @@ export class NotFoundError extends RdapApiError {
  * for this TLD/range" from "namespace covered but no matching record".
  */
 export class NotSupportedError extends NotFoundError {
-  constructor(message: string, error: string) {
-    super(message, error);
+  constructor(
+    message: string,
+    error: string,
+    reason: string | null = null,
+    registrableDomain: string | null = null,
+  ) {
+    super(message, error, reason, registrableDomain);
     this.name = "NotSupportedError";
   }
 }

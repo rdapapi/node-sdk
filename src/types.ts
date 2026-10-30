@@ -221,6 +221,10 @@ export interface BulkDomainResult {
   data?: DomainResponse | null;
   error?: string | null;
   message?: string | null;
+  /** The registry's own wording, on a `domain_reserved` entry. */
+  reason?: string | null;
+  /** The name to look up instead, on a `not_registrable` entry. */
+  registrableDomain?: string | null;
   /**
    * Partial `meta` for a failed entry, naming the upstream that was tried.
    * Absent when the entry failed before an upstream was chosen, as
